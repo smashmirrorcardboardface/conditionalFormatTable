@@ -19,19 +19,16 @@ import { VisualSettings } from './settings';
 export class Visual implements IVisual {
   private target: HTMLElement;
   private settings: VisualSettings;
-  private data: any[];
+  private data;
   private tableContainer: HTMLElement;
+  private tableElement: HTMLElement;
+  private dataTable;
 
-  private camelize(text) {
-    text = text.replace(/[-_\s.]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''));
-    return text.substr(0, 1).toLowerCase() + text.substr(1);
-  }
-
-  private processDataToObjectArray = (categories) => {
+  private processDataToObjectArray = (categories, rowConditionalFormatting) => {
     let objList = [];
 
     for (let i = 0; i < categories[0].values.length; i++) {
-      let obj = {};
+      let obj = { rowConditionalFormatting: null };
       for (let j = 0; j < categories.length; j++) {
         const asArray = Object.entries(categories[j].source.type);
 
@@ -40,18 +37,55 @@ export class Visual implements IVisual {
         )[0][0];
 
         if (categoryType === 'dateTime') {
-          obj[this.camelize(categories[j].source.displayName)] = new Date(
+          obj[categories[j].source.displayName] = new Date(
             categories[j].values[i].toString()
           ).toLocaleDateString('en-GB');
         } else {
-          obj[this.camelize(categories[j].source.displayName)] =
+          obj[categories[j].source.displayName] =
             categories[j].values[i].toString();
         }
       }
+
+      obj.rowConditionalFormatting = rowConditionalFormatting[i];
       objList.push(obj);
     }
     return objList;
   };
+
+  private generateTableHead = (table, data) => {
+    let thead = table.createTHead();
+    let row = thead.insertRow();
+    for (let key of Object.keys(data[0])) {
+      if (key === 'rowConditionalFormatting') {
+        continue;
+      }
+      let th = document.createElement('th');
+      th.innerHTML = key;
+      row.appendChild(th);
+    }
+  };
+
+  private generateTableBody = (table, data) => {
+    console.log(data);
+
+    let tbody = table.createTBody();
+    for (let i = 0; i < data.length; i++) {
+      let row = tbody.insertRow();
+
+      row.style.backgroundColor = this.data[i].rowConditionalFormatting;
+      for (let key of Object.keys(data[i])) {
+        if (key === 'rowConditionalFormatting') {
+          continue;
+        }
+        let cell = row.insertCell();
+        cell.innerHTML = data[i][key];
+      }
+    }
+  };
+
+  private clearTable(table) {
+    table.innerHTML = '';
+  }
 
   private addConditionalTableRowFormatting(table, data) {
     let rowCount = table.rows.length;
@@ -70,35 +104,33 @@ export class Visual implements IVisual {
 
     this.tableContainer = document.createElement('div');
     this.tableContainer.setAttribute('id', 'tableContainer');
+    this.tableContainer.classList.add('tableContainer');
+
+    this.tableElement = document.createElement('table');
+    this.tableElement.setAttribute('id', 'dataTable');
+    this.tableElement.classList.add('dataTable');
+
+    this.tableContainer.appendChild(this.tableElement);
     this.target.appendChild(this.tableContainer);
   }
 
   public update(options: VisualUpdateOptions) {
     this.tableContainer.style.width = options.viewport.width + 'px';
     this.tableContainer.style.height = options.viewport.height + 'px';
-    // this.tableContainer.style.overflow = 'auto';
+    this.tableContainer.style.overflow = 'auto';
 
     this.settings = Visual.parseSettings(
       options && options.dataViews && options.dataViews[0]
     );
 
     this.data = this.processDataToObjectArray(
-      options.dataViews[0].categorical.categories
+      options.dataViews[0].categorical.categories,
+      options.dataViews[0].categorical.values[0].values
     );
 
-    console.log(this.data);
-
-    new Grid({
-      columns: options.dataViews[0].categorical.categories.map(
-        (category) => category.source.displayName
-      ),
-      data: this.data,
-      width: options.viewport.width + 'px',
-      fixedHeader: true,
-      height: options.viewport.height - 8 + 'px',
-      sort: true,
-    }).render(this.tableContainer);
-
+    //this.clearTable(this.tableElement);
+    this.generateTableBody(this.tableElement, this.data);
+    this.generateTableHead(this.tableElement, this.data);
     //this.addConditionalTableRowFormatting(this.tableElement, this.data);
     console.log('Visual update', options);
   }

@@ -1,9 +1,35 @@
-p {
-    font-size: 20px;
-    font-weight: bold;
-    em {
-        background: yellow;
-        padding: 5px;
-        
-    }
+.tableContainer {
+  overflow: auto;
+  height: 100px;
+}
+.tableContainer thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: #009879;
+  color: #ffffff;
+  text-align: left;
+}
+.dataTable {
+  border-collapse: collapse;
+  font-size: 0.9em;
+  font-family: sans-serif;
+  min-width: 400px;
+}
+
+.dataTable th,
+.dataTable td {
+  padding: 12px 15px;
+}
+
+.dataTable tbody tr {
+  border-bottom: 1px solid #dddddd;
+}
+
+.dataTable tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
+
+.dataTable tbody tr:last-of-type {
+  border-bottom: 2px solid #009879;
 }
