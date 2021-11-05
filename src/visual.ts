@@ -1,28 +1,3 @@
-/*
- *  Power BI Visual CLI
- *
- *  Copyright (c) Microsoft Corporation
- *  All rights reserved.
- *  MIT License
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the ""Software""), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- *  THE SOFTWARE.
- */
 'use strict';
 
 import 'core-js/stable';
@@ -36,46 +11,80 @@ import VisualObjectInstance = powerbi.VisualObjectInstance;
 import DataView = powerbi.DataView;
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject;
 
-import { VisualSettings } from './settings';
-
 import { Grid } from 'gridjs';
 import 'gridjs/dist/theme/mermaid.css';
+
+import { VisualSettings } from './settings';
 
 export class Visual implements IVisual {
   private target: HTMLElement;
   private settings: VisualSettings;
-  private grid: Grid;
+  private data;
   private tableContainer: HTMLElement;
+  private tableElement: HTMLElement;
+  private dataTable;
 
-  private processData = (categories) => {
-    let values = [];
+  private processDataToObjectArray = (categories) => {
+    let objList = [];
+
     for (let i = 0; i < categories[0].values.length; i++) {
-      let valueRow = [];
+      let obj = {};
       for (let j = 0; j < categories.length; j++) {
-        // debugger;
-
         const asArray = Object.entries(categories[j].source.type);
 
         const categoryType = asArray.filter(
           ([key, value]) => value === true
         )[0][0];
 
-        console.log(categoryType);
-
         if (categoryType === 'dateTime') {
-          valueRow.push(
-            new Date(categories[j].values[i].toString()).toLocaleDateString(
-              'en-GB'
-            )
-          );
+          obj[categories[j].source.displayName] = new Date(
+            categories[j].values[i].toString()
+          ).toLocaleDateString('en-GB');
         } else {
-          valueRow.push(categories[j].values[i].toString());
+          obj[categories[j].source.displayName] =
+            categories[j].values[i].toString();
         }
       }
-      values.push(valueRow);
+      objList.push(obj);
     }
-    return values;
+    return objList;
   };
+
+  private generateTableHead = (table, data) => {
+    let thead = table.createTHead();
+    let row = thead.insertRow();
+    for (let key of Object.keys(data[0])) {
+      let th = document.createElement('th');
+      th.innerHTML = key;
+      row.appendChild(th);
+    }
+  };
+
+  private generateTableBody = (table, data) => {
+    let tbody = table.createTBody();
+    for (let i = 0; i < data.length; i++) {
+      let row = tbody.insertRow();
+      for (let key of Object.keys(data[i])) {
+        let cell = row.insertCell();
+        cell.innerHTML = data[i][key];
+      }
+    }
+  };
+
+  private clearTable(table) {
+    table.innerHTML = '';
+  }
+
+  private addConditionalTableRowFormatting(table, data) {
+    let rowCount = table.rows.length;
+    for (let i = 0; i < rowCount; i++) {
+      let row = table.rows[i];
+      let cellCount = row.cells.length;
+      for (let j = 0; j < cellCount; j++) {
+        row.cells[j].style.backgroundColor = '#ffff00';
+      }
+    }
+  }
 
   constructor(options: VisualConstructorOptions) {
     console.log('Visual constructor', options);
@@ -84,33 +93,30 @@ export class Visual implements IVisual {
     this.tableContainer = document.createElement('div');
     this.tableContainer.setAttribute('id', 'tableContainer');
 
-    this.target.appendChild(this.tableContainer);
+    this.tableElement = document.createElement('table');
+    this.tableElement.setAttribute('id', 'dataTable');
 
-    this.grid = new Grid({ data: [] }).render(
-      document.querySelector('#tableContainer')
-    );
+    this.tableContainer.appendChild(this.tableElement);
+    this.target.appendChild(this.tableContainer);
   }
 
   public update(options: VisualUpdateOptions) {
     this.tableContainer.style.width = options.viewport.width + 'px';
     this.tableContainer.style.height = options.viewport.height + 'px';
+    this.tableContainer.style.overflow = 'auto';
 
     this.settings = Visual.parseSettings(
       options && options.dataViews && options.dataViews[0]
     );
 
-    this.grid.updateConfig({
-      columns: options.dataViews[0].categorical.categories.map(
-        (category) => category.source.displayName
-      ),
-    });
+    this.data = this.processDataToObjectArray(
+      options.dataViews[0].categorical.categories
+    );
 
-    this.grid.updateConfig({
-      data: this.processData(options.dataViews[0].categorical.categories),
-    });
-
-    this.grid.forceRender();
-
+    //this.clearTable(this.tableElement);
+    this.generateTableBody(this.tableElement, this.data);
+    this.generateTableHead(this.tableElement, this.data);
+    this.addConditionalTableRowFormatting(this.tableElement, this.data);
     console.log('Visual update', options);
   }
 
